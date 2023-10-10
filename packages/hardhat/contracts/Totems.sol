@@ -6,17 +6,29 @@ import "hardhat/console.sol";
 
 import "@rmrk-team/evm-contracts/contracts/implementations/abstract/RMRKAbstractEquippable.sol";
 import "@rmrk-team/evm-contracts/contracts/implementations/utils/RMRKTokenURIPerToken.sol";
+import "@rmrk-team/evm-contracts/contracts/RMRK/extension/tokenProperties/IERC7508.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
+import "./interfaces/ITotems.sol";
+
+error TotemsNotCrafter();
+error TotemsMaxStageViolation(uint256 maxStage, uint256 attempedStage);
+error TotemsMaxTierViolation(uint256 maxTier, uint256 attempedTier);
+
+contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl, ITotems {
+	IERC7508 public immutable erc7508 = IERC7508(0xA77b75D5fDEC6E6e8E00e05c707a7CA81a3F9f4a);
 	using Counters for Counters.Counter;
 
 	Counters.Counter private _tokenIdCounter;
 
+    uint256 maxStage; // This defines a maximum stage the totem can reach. The stage of the `Totem` can also be considered a size stage.
+    uint256 maxTier; // This defines a maximum rarity tier a totem can reach. Can be regarded as the star rating of the totem.
 	bytes32 public constant CRAFTER_ROLE = keccak256("CRAFTER_ROLE");
 
-	constructor(
+	event TotemCrafted(uint256 indexed totemId, string element, uint256 stage, uint256 tier);
+
+    constructor(
 		string memory name,
 		string memory symbol,
 		string memory collectionMetadata,
@@ -35,6 +47,14 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
 		_setupRole(CRAFTER_ROLE, msg.sender);
 		transferOwnership(address(0));
 		_tokenIdCounter.increment(); // This is done, so that token IDs start with 1 and are compatible with ERC_6220
+
+		erc7508.setStringAttribute(address(this), 0, "element", "infernum"); // These are set, so that the user doesn't
+		erc7508.setStringAttribute(address(this), 0, "element", "eternum"); // have to pay for the setting the string
+		erc7508.setStringAttribute(address(this), 0, "element", "metamorphium"); // value to the ID representing it.
+		erc7508.setStringAttribute(address(this), 0, "element", "genesisium");
+		erc7508.setStringAttribute(address(this), 0, "element", "emphatium");
+		erc7508.setUintAttribute(address(this), 0, "stage", 0);
+		erc7508.setUintAttribute(address(this), 0, "tier", 0);
 	}
 
 	function supportsInterface(bytes4 interfaceId)
@@ -46,5 +66,32 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
 	{
 		return RMRKAbstractEquippable.supportsInterface(interfaceId) ||
 			AccessControl.supportsInterface(interfaceId);
+	}
+
+	function craft(
+		string memory element,
+		uint8 stage,
+		uint8 tier,
+		address to
+	) external override {
+		if (!hasRole(CRAFTER_ROLE, _msgSender())) revert TotemsNotCrafter();
+
+		uint256 tokenId = _tokenIdCounter.current();
+
+		_safeMint(to, tokenId, "");
+		_craftTotem(tokenId, element, stage, tier);
+
+		_tokenIdCounter.increment();
+	}
+
+	function _craftTotem(uint256 totemId, string memory element, uint8 stage, uint8 tier) internal virtual {
+        if (stage > maxStage) revert TotemsMaxStageViolation({maxStage: maxStage, attempedStage: stage});
+        if (tier > maxTier) revert TotemsMaxTierViolation({maxTier: maxTier, attempedTier: tier});
+
+		erc7508.setStringAttribute(address(this), totemId, "element", element);
+		erc7508.setUintAttribute(address(this), totemId, "stage", stage);
+		erc7508.setUintAttribute(address(this), totemId, "tier", tier);
+
+		emit TotemCrafted(totemId, element, stage, tier);
 	}
 }

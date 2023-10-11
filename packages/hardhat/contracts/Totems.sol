@@ -45,7 +45,6 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl, 
 	) {
 		_setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
 		_setupRole(CRAFTER_ROLE, msg.sender);
-		transferOwnership(address(0));
 		_tokenIdCounter.increment(); // This is done, so that token IDs start with 1 and are compatible with ERC_6220
 
 		erc7508.setStringAttribute(address(this), 0, "element", "infernum"); // These are set, so that the user doesn't

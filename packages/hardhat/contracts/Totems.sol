@@ -75,23 +75,19 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl, 
 		address to
 	) external override {
 		if (!hasRole(CRAFTER_ROLE, _msgSender())) revert TotemsNotCrafter();
+        if (stage > maxStage) revert TotemsMaxStageViolation({maxStage: maxStage, attempedStage: stage});
+        if (tier > maxTier) revert TotemsMaxTierViolation({maxTier: maxTier, attempedTier: tier});
 
 		uint256 tokenId = _tokenIdCounter.current();
 
 		_safeMint(to, tokenId, "");
-		_craftTotem(tokenId, element, stage, tier);
+
+		erc7508.setStringAttribute(address(this), tokenId, "element", element);
+		erc7508.setUintAttribute(address(this), tokenId, "stage", stage);
+		erc7508.setUintAttribute(address(this), tokenId, "tier", tier);
 
 		_tokenIdCounter.increment();
-	}
 
-	function _craftTotem(uint256 totemId, string memory element, uint8 stage, uint8 tier) internal virtual {
-        if (stage > maxStage) revert TotemsMaxStageViolation({maxStage: maxStage, attempedStage: stage});
-        if (tier > maxTier) revert TotemsMaxTierViolation({maxTier: maxTier, attempedTier: tier});
-
-		erc7508.setStringAttribute(address(this), totemId, "element", element);
-		erc7508.setUintAttribute(address(this), totemId, "stage", stage);
-		erc7508.setUintAttribute(address(this), totemId, "tier", tier);
-
-		emit TotemCrafted(totemId, element, stage, tier);
+		emit TotemCrafted(tokenId, element, stage, tier);
 	}
 }

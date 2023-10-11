@@ -54,7 +54,8 @@ contract Minter is AccessControl {
         if (msg.value != _fee) revert MinterIncorrectFee();
 
         string memory element = mintingUtils.getRandomElement();
-        totems.craft(element, 0, 0, msg.sender);
+        string memory uri = mintingUtils.getTotemUri(element, 0, 0);
+        totems.craft(element, uri, 0, 0, msg.sender);
     }
 
     function pauseMinting() external onlyRole(DEFAULT_ADMIN_ROLE) {

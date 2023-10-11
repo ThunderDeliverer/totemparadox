@@ -10,6 +10,8 @@ contract MintingUtils is AccessControl, IMintingUtils {
     uint256 private numberOfElements;
 
     mapping(uint256 index => Element) private elements;
+    mapping(uint256 elementId => mapping(uint256 stage => mapping(uint256 tier => string uri))) private totemUris;
+    mapping(string element => uint256 elementId) private elementIds;
 
     /**
      * @notice Used to store element distribution data
@@ -40,6 +42,11 @@ contract MintingUtils is AccessControl, IMintingUtils {
                 --i;
             }
         }
+    }
+
+    function getTotemUri(string memory element, uint256 stage, uint256 tier) public view returns (string memory) {
+        uint256 elementId = elementIds[element];
+        return totemUris[elementId][stage][tier];
     }
 
     function setElementDistribution(string[] memory _elements, uint8[] memory _from, uint8[] memory _to) public onlyRole(CONTRIBUTOR_ROLE) {

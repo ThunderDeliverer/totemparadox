@@ -69,6 +69,7 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl, 
 
 	function craft(
 		string memory element,
+		string memory tokenUri,
 		uint8 stage,
 		uint8 tier,
 		address to
@@ -80,6 +81,7 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl, 
 		uint256 tokenId = _tokenIdCounter.current();
 
 		_safeMint(to, tokenId, "");
+		_setTokenURI(tokenId, tokenUri);
 
 		erc7508.setStringAttribute(address(this), tokenId, "element", element);
 		erc7508.setUintAttribute(address(this), tokenId, "stage", stage);

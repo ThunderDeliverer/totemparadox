@@ -2,5 +2,5 @@
 pragma solidity ^0.8.21;
 
 interface ITotems {
-    function craft(string memory element, uint8 stage, uint8 tier, address to) external;
+    function craft(string memory element, string memory totemUri, uint8 stage, uint8 tier, address to) external;
 }

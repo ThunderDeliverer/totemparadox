@@ -6,17 +6,20 @@ import "hardhat/console.sol";
 
 import "@rmrk-team/evm-contracts/contracts/implementations/abstract/RMRKAbstractEquippable.sol";
 import "@rmrk-team/evm-contracts/contracts/implementations/utils/RMRKTokenURIPerToken.sol";
+import "@rmrk-team/evm-contracts/contracts/RMRK/extension/soulbound/RMRKSoulboundPerToken.sol";
 import "@rmrk-team/evm-contracts/contracts/RMRK/extension/tokenProperties/IERC7508.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
 import "./interfaces/ITotems.sol";
 
-error TotemsNotCrafter();
 error TotemsMaxStageViolation(uint256 maxStage, uint256 attempedStage);
 error TotemsMaxTierViolation(uint256 maxTier, uint256 attempedTier);
+error TotemsNotCrafter();
+error TotemsNotTransferable(uint256 tokenId);
+error TotemsTransferable(uint256 tokenId);
 
-contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl, ITotems {
+contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, RMRKSoulboundPerToken, AccessControl, ITotems {
 	IERC7508 public immutable erc7508 = IERC7508(0xA77b75D5fDEC6E6e8E00e05c707a7CA81a3F9f4a);
 	using Counters for Counters.Counter;
 
@@ -25,6 +28,7 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl, 
     uint256 maxStage; // This defines a maximum stage the totem can reach. The stage of the `Totem` can also be considered a size stage.
     uint256 maxTier; // This defines a maximum rarity tier a totem can reach. Can be regarded as the star rating of the totem.
 	bytes32 public constant CRAFTER_ROLE = keccak256("CRAFTER_ROLE");
+	bytes32 public constant TRANSFERABILITY_MANAGER_ROLE = keccak256("TRANSFERABILITY_MANAGER_ROLE");
 
 	event TotemCrafted(uint256 indexed totemId, string element, uint256 stage, uint256 tier);
 
@@ -60,10 +64,11 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl, 
 		public
 		view
 		virtual
-		override(AccessControl, RMRKAbstractEquippable)
+		override(AccessControl, RMRKAbstractEquippable, RMRKSoulbound)
 		returns (bool)
 	{
 		return RMRKAbstractEquippable.supportsInterface(interfaceId) ||
+			RMRKSoulbound.supportsInterface(interfaceId) ||
 			AccessControl.supportsInterface(interfaceId);
 	}
 
@@ -91,4 +96,49 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl, 
 
 		emit TotemCrafted(tokenId, element, stage, tier);
 	}
+
+	function disableTransferability(uint256 tokenId) public onlyRole(TRANSFERABILITY_MANAGER_ROLE) {
+		if (!isTransferable(tokenId, address(0), address(0))) revert TotemsNotTransferable({ tokenId: tokenId});
+
+		_setSoulbound(tokenId, true);
+	}
+
+	function batchDisableTransferability(uint256[] memory tokenIds) public onlyRole(TRANSFERABILITY_MANAGER_ROLE) {
+		for (uint256 i; i < tokenIds.length;) {
+			if (!isTransferable(tokenIds[i], address(0), address(0))) revert TotemsNotTransferable({ tokenId: tokenIds[i]});
+
+			_setSoulbound(tokenIds[i], true);
+
+			unchecked {
+				++i;
+			}
+		}
+	}
+
+	function enableTransferability(uint256 tokenId) public onlyRole(TRANSFERABILITY_MANAGER_ROLE) {
+		if (isTransferable(tokenId, address(0), address(0))) revert TotemsTransferable({ tokenId: tokenId});
+
+		_setSoulbound(tokenId, false);
+	}
+
+	function batchEnableTransferability(uint256[] memory tokenIds) public onlyRole(TRANSFERABILITY_MANAGER_ROLE) {
+		for (uint256 i; i < tokenIds.length;) {
+			if (isTransferable(tokenIds[i], address(0), address(0))) revert TotemsTransferable({ tokenId: tokenIds[i]});
+
+			_setSoulbound(tokenIds[i], false);
+
+			unchecked {
+				++i;
+			}
+		}
+	}
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal override(RMRKSoulbound, RMRKAbstractEquippable) {
+        RMRKSoulbound._beforeTokenTransfer(from, to, tokenId);
+        RMRKAbstractEquippable._beforeTokenTransfer(from, to, tokenId);
+    }
 }

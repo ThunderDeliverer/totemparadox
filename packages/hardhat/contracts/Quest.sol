@@ -9,7 +9,9 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 
 import "./interfaces/ITotems.sol";
 
+error QuestActive();
 error QuestMintingPaused();
+error QuestNotActive();
 error QuestNotCreator();
 
 contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
@@ -24,6 +26,8 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
     bytes32 public constant QUEST_CREATOR_ROLE = keccak256("QUEST_CREATOR_ROLE");
 
     event NewQuest(uint256 indexed questId, string name, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
+    event QuestUpdated(uint256 indexed questId, string name, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
+    event QuestStatusChanged(uint256 indexed questId, bool active);
 
     modifier onlyWhenMintingOperational {
         if (!mintingPaused) revert QuestMintingPaused();
@@ -58,6 +62,10 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
     function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControl, RMRKAbstractEquippable) returns (bool) {
         return AccessControl.supportsInterface(interfaceId)||
             RMRKAbstractEquippable.supportsInterface(interfaceId);
+    }
+
+    function isQuestActive(uint256 questId) public view returns (bool) {
+        return erc7508.getBoolTokenAttribute(address(this), questId, "active");
     }
 
     function isMintingOperational() public view returns (bool) {
@@ -99,7 +107,48 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
         erc7508.setUintAttribute(address(this), tokenId, "duration", duration);
         erc7508.setUintAttribute(address(this), tokenId, "difficulty", difficulty);
         erc7508.setUintAttribute(address(this), tokenId, "rewardId", rewardId);
+        erc7508.setBoolAttribute(address(this), tokenId, "active", true);
 
         emit NewQuest(tokenId, name, difficulty, duration, rewardId);
+        emit QuestStatusChanged(tokenId, true);
+    }
+
+    function updateQuest(
+        uint256 questId,
+        string memory newName,
+        uint256 newDuration,
+        uint256 newDifficulty,
+        uint256 newRewardId
+    ) public onlyRole(QUEST_CREATOR_ROLE) {
+        if (keccak256(abi.encode(newName)) != keccak256("")) {
+            erc7508.setStringAttribute(address(this), questId, "name", newName);
+        }
+        if (newDuration > 0) {
+            erc7508.setUintAttribute(address(this), questId, "duration", newDuration);
+        }
+        if (newDifficulty > 0) {
+            erc7508.setUintAttribute(address(this), questId, "difficulty", newDifficulty);
+        }
+        if (newRewardId > 0) {
+            erc7508.setUintAttribute(address(this), questId, "rewardId", newRewardId);
+        }
+
+        emit QuestUpdated(questId, newName, newDuration, newDifficulty, newRewardId);
+    }
+
+    function disableQuest(uint256 questId) public onlyRole(QUEST_CREATOR_ROLE) {
+        if (!isQuestActive(questId)) revert QuestNotActive();
+
+        erc7508.setBoolAttribute(address(this), questId, "active", false);
+
+        emit QuestStatusChanged(questId, false);
+    }
+
+    function enableQuest(uint256 questId) public onlyRole(QUEST_CREATOR_ROLE) {
+        if (isQuestActive(questId)) revert QuestActive();
+
+        erc7508.setBoolAttribute(address(this), questId, "active", true);
+
+        emit QuestStatusChanged(questId, true);
     }
 }

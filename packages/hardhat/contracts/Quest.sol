@@ -25,8 +25,8 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
     bool private mintingPaused;
     bytes32 public constant QUEST_CREATOR_ROLE = keccak256("QUEST_CREATOR_ROLE");
 
-    event NewQuest(uint256 indexed questId, string name, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
-    event QuestUpdated(uint256 indexed questId, string name, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
+    event NewQuest(uint256 indexed questId, string name, string element, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
+    event QuestUpdated(uint256 indexed questId, string name, string element, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
     event QuestStatusChanged(uint256 indexed questId, bool active);
 
     modifier onlyWhenMintingOperational {
@@ -74,6 +74,7 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
 
     function createQuest(
         string memory name,
+        string memory element,
         string memory primaryAssetUri,
         string memory tokenUri,
         string memory descriptionUri,
@@ -104,24 +105,29 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
         setPriority(tokenId, priorities);
 
         erc7508.setStringAttribute(address(this), tokenId, "name", name);
+        erc7508.setStringAttribute(address(this), tokenId, "element", element);
         erc7508.setUintAttribute(address(this), tokenId, "duration", duration);
         erc7508.setUintAttribute(address(this), tokenId, "difficulty", difficulty);
         erc7508.setUintAttribute(address(this), tokenId, "rewardId", rewardId);
         erc7508.setBoolAttribute(address(this), tokenId, "active", true);
 
-        emit NewQuest(tokenId, name, difficulty, duration, rewardId);
+        emit NewQuest(tokenId, name, element, difficulty, duration, rewardId);
         emit QuestStatusChanged(tokenId, true);
     }
 
     function updateQuest(
         uint256 questId,
         string memory newName,
+        string memory newElement,
         uint256 newDuration,
         uint256 newDifficulty,
         uint256 newRewardId
     ) public onlyRole(QUEST_CREATOR_ROLE) {
         if (keccak256(abi.encode(newName)) != keccak256("")) {
             erc7508.setStringAttribute(address(this), questId, "name", newName);
+        }
+        if (keccak256(abi.encode(newElement)) != keccak256("")) {
+            erc7508.setStringAttribute(address(this), questId, "element", newElement);
         }
         if (newDuration > 0) {
             erc7508.setUintAttribute(address(this), questId, "duration", newDuration);
@@ -133,7 +139,7 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
             erc7508.setUintAttribute(address(this), questId, "rewardId", newRewardId);
         }
 
-        emit QuestUpdated(questId, newName, newDuration, newDifficulty, newRewardId);
+        emit QuestUpdated(questId, newName, newElement, newDuration, newDifficulty, newRewardId);
     }
 
     function disableQuest(uint256 questId) public onlyRole(QUEST_CREATOR_ROLE) {

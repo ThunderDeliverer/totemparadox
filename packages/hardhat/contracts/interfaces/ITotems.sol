@@ -11,4 +11,6 @@ interface ITotems {
     function enableTransferability(uint256 tokenId) external;
 
     function batchEnableTransferability(uint256[] memory tokenIds) external;
+
+    function ownerOf(uint256 tokenId) external view returns (address);
 }

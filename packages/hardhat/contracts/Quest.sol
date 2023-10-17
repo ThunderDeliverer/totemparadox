@@ -12,6 +12,7 @@ import "./interfaces/ITotems.sol";
 error QuestActive();
 error QuestInstanceDoesNotExist();
 error QuestJoinCutoffElapsed(uint256 startTime, uint256 joinAttemptTime);
+error QuestMaxTotemsPerInstanceReached();
 error QuestMintingPaused();
 error QuestNotActive();
 error QuestNotCreator();
@@ -26,6 +27,7 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
     ITotems public immutable totems;
 
     uint256 public questJoinTimeBpts; // Emout of time after the quest is started, that the user can join the quest. Expressed in basis points (1/100 of a percent)
+    uint256 public maxTotemsPerInstance;
     bool private mintingPaused;
     bytes32 public constant QUEST_CREATOR_ROLE = keccak256("QUEST_CREATOR_ROLE");
     mapping (uint256 questId => uint256 latestInstace) public latestInstances;
@@ -40,6 +42,7 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
     event NewQuest(uint256 indexed questId, string name, string element, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
     event QuestJoinTimeBptsUpdated(uint256 newJoinTimeBpts);
     event QuestInstanceJoined(uint256 indexed questId, uint256 questInstance, uint256 indexed totemId);
+    event QuestMaxTotemsPerInstanceUpdated(uint256 newMaxTotemsPerInstance);
     event QuestUpdated(uint256 indexed questId, string name, string element, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
     event QuestStarted(uint256 indexed questId, uint256 questInstance, uint256 indexed totemId);
     event QuestStatusChanged(uint256 indexed questId, bool active);
@@ -198,6 +201,7 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
 
         QuestInstance memory instance = questInstances[questId][questInstance];
         if (instance.startTime == 0) revert QuestInstanceDoesNotExist();
+        if (instance.totemIds.length > maxTotemsPerInstance) revert QuestMaxTotemsPerInstanceReached();
 
         uint256 joinBuffer = instance.startTime + (erc7508.getUintTokenAttribute(address(this), questId, "duration") * questJoinTimeBpts / 10_000);
         if (instance.startTime + joinBuffer < block.timestamp) revert QuestJoinCutoffElapsed({ startTime: instance.startTime, joinAttemptTime: block.timestamp});
@@ -212,5 +216,11 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
         questJoinTimeBpts = newJoinTimeBpts;
 
         emit QuestJoinTimeBptsUpdated(newJoinTimeBpts);
+    }
+
+    function updateMaxTotemsPerInstance(uint256 newMaxTotemsPerInstance) public onlyRole(QUEST_CREATOR_ROLE) {
+        maxTotemsPerInstance = newMaxTotemsPerInstance;
+
+        emit QuestMaxTotemsPerInstanceUpdated(newMaxTotemsPerInstance);
     }
 }

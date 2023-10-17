@@ -38,6 +38,7 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
     }
 
     event NewQuest(uint256 indexed questId, string name, string element, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
+    event QuestJoinTimeBptsUpdated(uint256 newJoinTimeBpts);
     event QuestInstanceJoined(uint256 indexed questId, uint256 questInstance, uint256 indexed totemId);
     event QuestUpdated(uint256 indexed questId, string name, string element, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
     event QuestStarted(uint256 indexed questId, uint256 questInstance, uint256 indexed totemId);
@@ -205,5 +206,11 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
 
         questInstances[questId][questInstance].totemIds.push(totemId);
         emit QuestStarted(questId, questInstance, totemId);
+    }
+
+    function updateQuestJoinTimeBpts(uint256 newJoinTimeBpts) public onlyRole(QUEST_CREATOR_ROLE) {
+        questJoinTimeBpts = newJoinTimeBpts;
+
+        emit QuestJoinTimeBptsUpdated(newJoinTimeBpts);
     }
 }

@@ -10,9 +10,12 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "./interfaces/ITotems.sol";
 
 error QuestActive();
+error QuestInstanceDoesNotExist();
+error QuestJoinCutoffElapsed(uint256 startTime, uint256 joinAttemptTime);
 error QuestMintingPaused();
 error QuestNotActive();
 error QuestNotCreator();
+error QuestNotTotemOwner();
 
 contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
 	IERC7508 public immutable erc7508 = IERC7508(0xA77b75D5fDEC6E6e8E00e05c707a7CA81a3F9f4a);
@@ -22,11 +25,22 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
 
     ITotems public immutable totems;
 
+    uint256 public questJoinTimeBpts; // Emout of time after the quest is started, that the user can join the quest. Expressed in basis points (1/100 of a percent)
     bool private mintingPaused;
     bytes32 public constant QUEST_CREATOR_ROLE = keccak256("QUEST_CREATOR_ROLE");
+    mapping (uint256 questId => uint256 latestInstace) public latestInstances;
+    mapping (uint256 questId => mapping (uint256 instanceId => QuestInstance)) public questInstances;
+
+    struct QuestInstance {
+        uint256 startTime;
+        uint256 endTime;
+        uint256[] totemIds;
+    }
 
     event NewQuest(uint256 indexed questId, string name, string element, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
+    event QuestInstanceJoined(uint256 indexed questId, uint256 questInstance, uint256 indexed totemId);
     event QuestUpdated(uint256 indexed questId, string name, string element, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
+    event QuestStarted(uint256 indexed questId, uint256 questInstance, uint256 indexed totemId);
     event QuestStatusChanged(uint256 indexed questId, bool active);
 
     modifier onlyWhenMintingOperational {
@@ -156,5 +170,40 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
         erc7508.setBoolAttribute(address(this), questId, "active", true);
 
         emit QuestStatusChanged(questId, true);
+    }
+
+    function startQuest(uint256 questId, uint256 totemId) public {
+        if (!isQuestActive(questId)) revert QuestNotActive();
+        if (totems.ownerOf(totemId) != msg.sender) revert QuestNotTotemOwner();
+
+        totems.disableTransferability(totemId);
+
+        uint256 questInstance = latestInstances[questId] + 1;
+
+        uint256 start = block.timestamp;
+        uint256 end = start + erc7508.getUintTokenAttribute(address(this), questId, "duration");
+        uint256[] memory totemIds = new uint256[](1);
+        totemIds[0] = totemId;
+
+        questInstances[questId][questInstance] = QuestInstance(start, end, totemIds);
+
+        latestInstances[questId] = questInstance;
+        emit QuestStarted(questId, questInstance, totemId);
+    }
+
+    function joinQuest(uint256 questId, uint256 questInstance, uint256 totemId) public {
+        if (!isQuestActive(questId)) revert QuestNotActive();
+        if (totems.ownerOf(totemId) != msg.sender) revert QuestNotTotemOwner();
+
+        QuestInstance memory instance = questInstances[questId][questInstance];
+        if (instance.startTime == 0) revert QuestInstanceDoesNotExist();
+
+        uint256 joinBuffer = instance.startTime + (erc7508.getUintTokenAttribute(address(this), questId, "duration") * questJoinTimeBpts / 10_000);
+        if (instance.startTime + joinBuffer < block.timestamp) revert QuestJoinCutoffElapsed({ startTime: instance.startTime, joinAttemptTime: block.timestamp});
+
+        totems.disableTransferability(totemId);
+
+        questInstances[questId][questInstance].totemIds.push(totemId);
+        emit QuestStarted(questId, questInstance, totemId);
     }
 }

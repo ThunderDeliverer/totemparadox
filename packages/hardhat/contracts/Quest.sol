@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
 import "./interfaces/ITotems.sol";
+import "./interfaces/IRewards.sol";
 
 error QuestActive();
 error QuestInstanceDoesNotExist();
@@ -17,6 +18,7 @@ error QuestMintingPaused();
 error QuestNotActive();
 error QuestNotCreator();
 error QuestNotTotemOwner();
+error QuestStillInProgress(uint256 endTime, uint256 currentTime);
 
 contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
 	IERC7508 public immutable erc7508 = IERC7508(0xA77b75D5fDEC6E6e8E00e05c707a7CA81a3F9f4a);
@@ -25,6 +27,7 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
     Counters.Counter private _tokenIdCounter;
 
     ITotems public immutable totems;
+    IRewards public rewards;
 
     uint256 public questJoinTimeBpts; // Emout of time after the quest is started, that the user can join the quest. Expressed in basis points (1/100 of a percent)
     uint256 public maxTotemsPerInstance;
@@ -40,10 +43,12 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
     }
 
     event NewQuest(uint256 indexed questId, string name, string element, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
+    event QuestCompleted(uint256 indexed questId, uint256 indexed questInstance, uint256[] totemIds);
     event QuestJoinTimeBptsUpdated(uint256 newJoinTimeBpts);
     event QuestInstanceJoined(uint256 indexed questId, uint256 questInstance, uint256 indexed totemId);
     event QuestMaxTotemsPerInstanceUpdated(uint256 newMaxTotemsPerInstance);
     event QuestUpdated(uint256 indexed questId, string name, string element, uint256 difficulty, uint256 duration, uint256 indexed rewardId);
+    event QuestRewardsAddressUpdated(address newRewardsAddress);
     event QuestStarted(uint256 indexed questId, uint256 questInstance, uint256 indexed totemId);
     event QuestStatusChanged(uint256 indexed questId, bool active);
 
@@ -222,5 +227,35 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
         maxTotemsPerInstance = newMaxTotemsPerInstance;
 
         emit QuestMaxTotemsPerInstanceUpdated(newMaxTotemsPerInstance);
+    }
+
+    function setRewardsAddress(address rewardsAddress) public onlyRole(QUEST_CREATOR_ROLE) {
+        rewards = IRewards(rewardsAddress);
+
+        emit QuestRewardsAddressUpdated(rewardsAddress);
+    }
+
+    function completeQuest(uint256 questId, uint256 instanceId) public {
+        if (!isQuestActive(questId)) revert QuestNotActive();
+
+        QuestInstance memory instance = questInstances[questId][instanceId];
+        if (instance.startTime == 0) revert QuestInstanceDoesNotExist();
+        if (instance.endTime > block.timestamp) revert QuestStillInProgress({ endTime: instance.endTime, currentTime: block.timestamp});
+
+        uint256 rewardId = erc7508.getUintTokenAttribute(address(this), questId, "rewardId");
+        uint256[] memory totemIds = instance.totemIds;
+        string memory questElement = erc7508.getStringTokenAttribute(address(this), questId, "element");
+
+        rewards.distributeRewards(rewardId, totemIds, questElement);
+
+        for (uint256 i; i < totemIds.length; ) {
+            totems.enableTransferability(totemIds[i]);
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        emit QuestCompleted(questId, instanceId, totemIds);
     }
 }

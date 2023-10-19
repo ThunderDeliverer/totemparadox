@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.21;
 
-import "@rmrk-team/evm-contracts/contracts/implementations/abstract/RMRKAbstractEquippable.sol";
+import "@rmrk-team/evm-contracts/contracts/implementations/abstract/RMRKAbstractMultiAsset.sol";
 import "@rmrk-team/evm-contracts/contracts/implementations/utils/RMRKTokenURIPerToken.sol";
 import "@rmrk-team/evm-contracts/contracts/RMRK/extension/tokenProperties/IERC7508.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -20,21 +20,21 @@ error QuestNotCreator();
 error QuestNotTotemOwner();
 error QuestStillInProgress(uint256 endTime, uint256 currentTime);
 
-contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
-	IERC7508 public immutable erc7508 = IERC7508(0xA77b75D5fDEC6E6e8E00e05c707a7CA81a3F9f4a);
+contract Quest is RMRKAbstractMultiAsset, RMRKTokenURIPerToken, AccessControl {
+	IERC7508 private immutable erc7508 = IERC7508(0xA77b75D5fDEC6E6e8E00e05c707a7CA81a3F9f4a);
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIdCounter;
 
-    ITotems public immutable totems;
-    IRewards public rewards;
+    ITotems private immutable totems;
+    IRewards private rewards;
 
-    uint256 public questJoinTimeBpts; // Emout of time after the quest is started, that the user can join the quest. Expressed in basis points (1/100 of a percent)
-    uint256 public maxTotemsPerInstance;
+    uint256 private _questJoinTimeBpts; // Emout of time after the quest is started, that the user can join the quest. Expressed in basis points (1/100 of a percent)
+    uint256 private _maxTotemsPerInstance;
     bool private mintingPaused;
     bytes32 public constant QUEST_CREATOR_ROLE = keccak256("QUEST_CREATOR_ROLE");
-    mapping (uint256 questId => uint256 latestInstace) public latestInstances;
-    mapping (uint256 questId => mapping (uint256 instanceId => QuestInstance)) public questInstances;
+    mapping (uint256 questId => uint256 latestInstace) private latestInstances;
+    mapping (uint256 questId => mapping (uint256 instanceId => QuestInstance)) private questInstances;
 
     struct QuestInstance {
         uint256 startTime;
@@ -56,8 +56,6 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
         if (!mintingPaused) revert QuestMintingPaused();
         _;
     }
-
-    event FeeUpdated(uint256 newFee);
 
     constructor(
         string memory name,
@@ -82,9 +80,9 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
         mintingPaused = false;
     }
 
-    function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControl, RMRKAbstractEquippable) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControl, RMRKAbstractMultiAsset) returns (bool) {
         return AccessControl.supportsInterface(interfaceId)||
-            RMRKAbstractEquippable.supportsInterface(interfaceId);
+            RMRKAbstractMultiAsset.supportsInterface(interfaceId);
     }
 
     function isQuestActive(uint256 questId) public view returns (bool) {
@@ -93,6 +91,26 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
 
     function isMintingOperational() public view returns (bool) {
         return !mintingPaused;
+    }
+
+    function getRewardsAddress() public view returns (address) {
+        return address(rewards);
+    }
+
+    function questJoinTimeBpts() public view returns (uint256) {
+        return _questJoinTimeBpts;
+    }
+
+    function maxTotemsPerInstance() public view returns (uint256) {
+        return _maxTotemsPerInstance;
+    }
+
+    function getLatestInstance(uint256 questId) public view returns (uint256) {
+        return latestInstances[questId];
+    }
+
+    function getQuestInstance(uint256 questId, uint256 instanceId) public view returns (QuestInstance memory) {
+        return questInstances[questId][instanceId];
     }
 
     function createQuest(
@@ -206,9 +224,9 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
 
         QuestInstance memory instance = questInstances[questId][questInstance];
         if (instance.startTime == 0) revert QuestInstanceDoesNotExist();
-        if (instance.totemIds.length > maxTotemsPerInstance) revert QuestMaxTotemsPerInstanceReached();
+        if (instance.totemIds.length > _maxTotemsPerInstance) revert QuestMaxTotemsPerInstanceReached();
 
-        uint256 joinBuffer = instance.startTime + (erc7508.getUintTokenAttribute(address(this), questId, "duration") * questJoinTimeBpts / 10_000);
+        uint256 joinBuffer = instance.startTime + (erc7508.getUintTokenAttribute(address(this), questId, "duration") * _questJoinTimeBpts / 10_000);
         if (instance.startTime + joinBuffer < block.timestamp) revert QuestJoinCutoffElapsed({ startTime: instance.startTime, joinAttemptTime: block.timestamp});
 
         totems.disableTransferability(totemId);
@@ -218,13 +236,13 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
     }
 
     function updateQuestJoinTimeBpts(uint256 newJoinTimeBpts) public onlyRole(QUEST_CREATOR_ROLE) {
-        questJoinTimeBpts = newJoinTimeBpts;
+        _questJoinTimeBpts = newJoinTimeBpts;
 
         emit QuestJoinTimeBptsUpdated(newJoinTimeBpts);
     }
 
     function updateMaxTotemsPerInstance(uint256 newMaxTotemsPerInstance) public onlyRole(QUEST_CREATOR_ROLE) {
-        maxTotemsPerInstance = newMaxTotemsPerInstance;
+        _maxTotemsPerInstance = newMaxTotemsPerInstance;
 
         emit QuestMaxTotemsPerInstanceUpdated(newMaxTotemsPerInstance);
     }

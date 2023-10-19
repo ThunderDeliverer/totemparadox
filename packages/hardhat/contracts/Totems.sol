@@ -48,14 +48,6 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, RMRKSoulboundPe
 		_setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
 		_setupRole(CRAFTER_ROLE, msg.sender);
 		_tokenIdCounter.increment(); // This is done, so that token IDs start with 1 and are compatible with ERC_6220
-
-		erc7508.setStringAttribute(address(this), 0, "element", "infernum"); // These are set, so that the user doesn't
-		erc7508.setStringAttribute(address(this), 0, "element", "eternum"); // have to pay for the setting the string
-		erc7508.setStringAttribute(address(this), 0, "element", "metamorphium"); // value to the ID representing it.
-		erc7508.setStringAttribute(address(this), 0, "element", "genesisium");
-		erc7508.setStringAttribute(address(this), 0, "element", "emphatium");
-		erc7508.setUintAttribute(address(this), 0, "stage", 0);
-		erc7508.setUintAttribute(address(this), 0, "tier", 0);
 	}
 
 	function supportsInterface(bytes4 interfaceId)
@@ -129,6 +121,16 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, RMRKSoulboundPe
 				++i;
 			}
 		}
+	}
+
+	function offsetAttributeSettingCost() public onlyRole(DEFAULT_ADMIN_ROLE) {
+		erc7508.setStringAttribute(address(this), 0, "element", "infernum"); // These are set, so that the user doesn't
+		erc7508.setStringAttribute(address(this), 0, "element", "eternum"); // have to pay for the setting the string
+		erc7508.setStringAttribute(address(this), 0, "element", "metamorphium"); // value to the ID representing it.
+		erc7508.setStringAttribute(address(this), 0, "element", "genesisium");
+		erc7508.setStringAttribute(address(this), 0, "element", "emphatium");
+		erc7508.setUintAttribute(address(this), 0, "stage", 0);
+		erc7508.setUintAttribute(address(this), 0, "tier", 0);
 	}
 
     function _beforeTokenTransfer(

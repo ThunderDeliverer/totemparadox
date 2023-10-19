@@ -248,13 +248,7 @@ contract Quest is RMRKAbstractEquippable, RMRKTokenURIPerToken, AccessControl {
 
         rewards.distributeRewards(rewardId, totemIds, questElement);
 
-        for (uint256 i; i < totemIds.length; ) {
-            totems.enableTransferability(totemIds[i]);
-
-            unchecked {
-                ++i;
-            }
-        }
+        totems.batchEnableTransferability(totemIds);
 
         emit QuestCompleted(questId, instanceId, totemIds);
     }

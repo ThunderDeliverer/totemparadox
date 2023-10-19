@@ -13,12 +13,11 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 
 error TotemsMaxStageViolation(uint256 maxStage, uint256 attempedStage);
 error TotemsMaxTierViolation(uint256 maxTier, uint256 attempedTier);
-error TotemsNotCrafter();
 error TotemsNotTransferable(uint256 tokenId);
 error TotemsTransferable(uint256 tokenId);
 
 contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, RMRKSoulboundPerToken, AccessControl {
-	IERC7508 public immutable erc7508 = IERC7508(0xA77b75D5fDEC6E6e8E00e05c707a7CA81a3F9f4a);
+	IERC7508 private immutable erc7508 = IERC7508(0xA77b75D5fDEC6E6e8E00e05c707a7CA81a3F9f4a);
 	using Counters for Counters.Counter;
 
 	Counters.Counter private _tokenIdCounter;
@@ -68,8 +67,7 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, RMRKSoulboundPe
 		uint8 stage,
 		uint8 tier,
 		address to
-	) external {
-		if (!hasRole(CRAFTER_ROLE, _msgSender())) revert TotemsNotCrafter();
+	) external onlyRole(CRAFTER_ROLE) {
         if (stage > maxStage) revert TotemsMaxStageViolation({maxStage: maxStage, attempedStage: stage});
         if (tier > maxTier) revert TotemsMaxTierViolation({maxTier: maxTier, attempedTier: tier});
 
@@ -121,16 +119,6 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, RMRKSoulboundPe
 				++i;
 			}
 		}
-	}
-
-	function offsetAttributeSettingCost() public onlyRole(DEFAULT_ADMIN_ROLE) {
-		erc7508.setStringAttribute(address(this), 0, "element", "infernum"); // These are set, so that the user doesn't
-		erc7508.setStringAttribute(address(this), 0, "element", "eternum"); // have to pay for the setting the string
-		erc7508.setStringAttribute(address(this), 0, "element", "metamorphium"); // value to the ID representing it.
-		erc7508.setStringAttribute(address(this), 0, "element", "genesisium");
-		erc7508.setStringAttribute(address(this), 0, "element", "emphatium");
-		erc7508.setUintAttribute(address(this), 0, "stage", 0);
-		erc7508.setUintAttribute(address(this), 0, "tier", 0);
 	}
 
     function _beforeTokenTransfer(

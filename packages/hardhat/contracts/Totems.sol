@@ -22,11 +22,12 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, RMRKSoulboundPe
 
 	Counters.Counter private _tokenIdCounter;
 
-    uint256 maxStage; // This defines a maximum stage the totem can reach. The stage of the `Totem` can also be considered a size stage.
-    uint256 maxTier; // This defines a maximum rarity tier a totem can reach. Can be regarded as the star rating of the totem.
+    uint256 private _maxStage; // This defines a maximum stage the totem can reach. The stage of the `Totem` can also be considered a size stage.
+    uint256 private _maxTier; // This defines a maximum rarity tier a totem can reach. Can be regarded as the star rating of the totem.
 	bytes32 public constant CRAFTER_ROLE = keccak256("CRAFTER_ROLE");
 	bytes32 public constant TRANSFERABILITY_MANAGER_ROLE = keccak256("TRANSFERABILITY_MANAGER_ROLE");
 
+	event TotemMaxTierAndStageUpdated(uint256 newMaxTier, uint256 newMaxStage);
 	event TotemCrafted(uint256 indexed totemId, string element, uint256 stage, uint256 tier);
 
     constructor(
@@ -61,6 +62,14 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, RMRKSoulboundPe
 			AccessControl.supportsInterface(interfaceId);
 	}
 
+	function maxTier() public view returns (uint256) {
+		return _maxTier;
+	}
+
+	function maxStage() public view returns (uint256) {
+		return _maxStage;
+	}
+
 	function craft(
 		string memory element,
 		string memory tokenUri,
@@ -68,8 +77,8 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, RMRKSoulboundPe
 		uint8 tier,
 		address to
 	) external onlyRole(CRAFTER_ROLE) {
-        if (stage > maxStage) revert TotemsMaxStageViolation({maxStage: maxStage, attempedStage: stage});
-        if (tier > maxTier) revert TotemsMaxTierViolation({maxTier: maxTier, attempedTier: tier});
+        if (stage > _maxStage) revert TotemsMaxStageViolation({ maxStage: _maxStage, attempedStage: stage});
+        if (tier > _maxTier) revert TotemsMaxTierViolation({ maxTier: _maxTier, attempedTier: tier});
 
 		uint256 tokenId = _tokenIdCounter.current();
 
@@ -119,6 +128,16 @@ contract Totems is RMRKAbstractEquippable, RMRKTokenURIPerToken, RMRKSoulboundPe
 				++i;
 			}
 		}
+	}
+
+	function updateMaxTierAndStage(uint256 newMaxTier, uint256 newMaxStage) external onlyRole(DEFAULT_ADMIN_ROLE) {
+		if (newMaxTier < _maxTier) revert TotemsMaxTierViolation({ maxTier: _maxTier, attempedTier: newMaxTier });
+		if (newMaxStage < _maxStage) revert TotemsMaxStageViolation({ maxStage: _maxStage, attempedStage: newMaxStage });
+
+		_maxTier = newMaxTier;
+		_maxStage = newMaxStage;
+
+		emit TotemMaxTierAndStageUpdated(newMaxTier, newMaxStage);
 	}
 
     function _beforeTokenTransfer(

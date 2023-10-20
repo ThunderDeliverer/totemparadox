@@ -9,8 +9,8 @@ contract Resources is ERC1155, AccessControl, ERC1155Supply {
     bytes32 public constant URI_SETTER_ROLE = keccak256("URI_SETTER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    constructor(address defaultAdmin, address minter) ERC1155("") {
-        _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
+    constructor(address minter) ERC1155("") {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, minter);
     }
 

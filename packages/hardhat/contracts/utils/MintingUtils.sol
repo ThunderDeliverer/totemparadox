@@ -23,8 +23,8 @@ contract MintingUtils is AccessControl, IMintingUtils {
      */
     struct Element {
         string name;
-        uint8 from;
-        uint8 to;
+        uint128 from;
+        uint128 to;
     }
 
     constructor() {
@@ -49,7 +49,7 @@ contract MintingUtils is AccessControl, IMintingUtils {
         return totemUris[elementId][stage][tier];
     }
 
-    function setElementDistribution(string[] memory _elements, uint8[] memory _from, uint8[] memory _to) public onlyRole(CONTRIBUTOR_ROLE) {
+    function setElementDistribution(string[] memory _elements, uint128[] memory _from, uint128[] memory _to) public onlyRole(CONTRIBUTOR_ROLE) {
         if(_elements.length != _from.length) revert ArrayMismatch();
         if(_elements.length != _to.length) revert ArrayMismatch();
 

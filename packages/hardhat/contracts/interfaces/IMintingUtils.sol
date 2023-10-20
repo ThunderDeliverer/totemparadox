@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 error ArrayMismatch();
 
 interface IMintingUtils {
-    event ElementUpdated(string name, uint8 from, uint8 to);
+    event ElementUpdated(string name, uint128 from, uint128 to);
 
     function getRandomElement() external view returns (string memory);
 

@@ -39,7 +39,6 @@ contract Rewards is  AccessControl {
     constructor(
         uint256 initialMaxTier,
         address totems_,
-        address resources_,
         address initialRewardsCreator_
     ) {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
